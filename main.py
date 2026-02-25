@@ -32,7 +32,9 @@ class AgentRequest(BaseModel):
 
 @app.post("/scan_url")
 async def scan_url_endpoint(request: URLRequest):
-    url_id = base64.urlsafe_b64encode(request.url.encode()).decode().strip("=")
+    # ලින්ක් එකේ තියෙන අනවශ්‍ය හිස්තැන් අයින් කරනවා
+    clean_url = request.url.strip()
+    url_id = base64.urlsafe_b64encode(clean_url.encode()).decode().strip("=")
     api_url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
     headers = {"x-apikey": VT_API_KEY}
     
@@ -42,9 +44,12 @@ async def scan_url_endpoint(request: URLRequest):
             stats = response.json()['data']['attributes']['last_analysis_stats']
             if stats['malicious'] > 0:
                 return {"status": "blocked", "message": f"🛑 CLOUD ALERT: MALICIOUS URL BLOCKED!"}
-            return {"status": "clean", "message": f"✅ URL is safe."}
+            return {"status": "clean", "message": f"✅ URL is safe (Verified by Cloud)."}
+        elif response.status_code == 404:
+            # ලින්ක් එක අලුත් එකක් නම්, සාමාන්‍යයෙන් Safe විදිහට සලකනවා
+            return {"status": "clean", "message": "✅ URL is New/Unknown (No Threat Records Found)."}
         else:
-            return {"status": "error", "message": "API Error or URL not found."}
+            return {"status": "error", "message": f"API Error: {response.status_code}"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
@@ -64,4 +69,5 @@ if __name__ == "__main__":
     # Cloud එකෙන් දෙන Port එක ගන්නවා, නැත්නම් 10000 පාවිච්චි කරනවා
     port = int(os.environ.get("PORT", 10000))
     print(f"CyberGuard Cloud Engine Initializing on port {port}...")
+
     uvicorn.run(app, host="0.0.0.0", port=port)
